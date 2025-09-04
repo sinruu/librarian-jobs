@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사서Job - 사서 채용 정보 플랫폼</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        /* 커스텀 애니메이션 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* 그라데이션 배경 */
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        /* 유리모피즘 효과 */
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* 펄스 애니메이션 */
+        .pulse-glow {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-50" x-data="librarianJobApp()" x-cloak>
+    <!-- 상단 네비게이션 -->
+    <nav class="gradient-bg text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="flex items-center mr-8">
+                        <i data-lucide="book-open" class="h-8 w-8 mr-3"></i>
+                        <h1 class="text-2xl font-bold">사서Job</h1>
+                        <span class="ml-2 text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full">BETA</span>
+                    </div>
+                    
+                    <div class="hidden md:flex space-x-6 text-sm">
+                        <a href="#home" class="hover:text-blue-200 transition-colors">채용공고</a>
+                        <a href="#stats" class="hover:text-blue-200 transition-colors">통계</a>
+                        <a href="#alerts" class="hover:text-blue-200 transition-colors">알림설정</a>
+                        <a href="#about" class="hover:text-blue-200 transition-colors">소개</a>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button 
+                        @click="refreshJobs()"
+                        class="flex items-center px-3 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition-all text-sm"
+                        :disabled="loading"
+                    >
+                        <i data-lucide="refresh-cw" :class="{'animate-spin': loading}" class="h-4 w-4 mr-2"></i>
+                        <span x-text="loading ? '업데이트 중...' : '새로고침'"></span>
+                    </button>
+                    
+                    <button class="relative p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-all">
+                        <i data-lucide="bell" class="h-5 w-5"></i>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-xs rounded-full h-5 w-5 flex items-center justify-center" 
+                              x-text="newJobsCount" x-show="newJobsCount > 0"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 대시보드 통계 -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" id="stats">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-6 text-center fade-in">
+                <div class="text-3xl font-bold text-blue-600" x-text="stats.totalJobs">0</div>
+                <div class="text-sm text-gray-600 mt-1">전체 공고</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-6 text-center fade-in">
+                <div class="text-3xl font-bold text-green-600" x-text="stats.newToday">0</div>
+                <div class="text-sm text-gray-600 mt-1">오늘 신규</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-6 text-center fade-in">
+                <div class="text-3xl font-bold text-purple-600" x-text="stats.urgent">0</div>
+                <div class="text-sm text-gray-600 mt-1">마감 임박</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-6 text-center fade-in">
+                <div class="text-3xl font-bold text-orange-600" x-text="stats.government">0</div>
+                <div class="text-sm text-gray-600 mt-1">공무원</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 검색 및 필터 섹션 -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8" id="home">
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+                <i data-lucide="search" class="h-5 w-5 mr-2 text-blue-600"></i>
+                채용공고 검색
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="relative">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4"></i>
+                    <input
+                        type="text"
+                        placeholder="기관명, 지역, 키워드 검색..."
+                        class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        x-model="searchTerm"
+                        @input="filterJobs"
+                    />
+                </div>
+                
+                <select
+                    class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    x-model="filterType"
+                    @change="filterJobs"
+                >
+                    <option value="">모든 유형</option>
+                    <option value="국가공무원">국가공무원</option>
+                    <option value="지방공무원">지방공무원</option>
+                    <option value="교육공무직">교육공무직</option>
+                    <option value="계약직">계약직</option>
+                    <option value="기간제">기간제</option>
+                    <option value="정규직">정규직</option>
+                </select>
+
+                <select
+                    class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    x-model="filterRegion"
+                    @change="filterJobs"
+                >
+                    <option value="">모든 지역</option>
+                    <option value="서울">서울</option>
+                    <option value="경기">경기</option>
+                    <option value="인천">인천</option>
+                    <option value="부산">부산</option>
+                    <option value="대구">대구</option>
+                    <option value="대전">대전</option>
+                    <option value="광주">광주</option>
+                    <option value="울산">울산</option>
+                    <option value="세종">세종</option>
+                </select>
+
+                <select
+                    class="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    x-model="sortOrder"
+                    @change="filterJobs"
+                >
+                    <option value="newest">최신순</option>
+                    <option value="deadline">마감일순</option>
+                    <option value="salary">급여순</option>
+                    <option value="alphabetical">기관명순</option>
+                </select>
+            </div>
+            
+            <div class="flex flex-wrap gap-2 text-sm">
+                <span class="text-gray-600 mr-2">빠른 필터:</span>
+                <button @click="quickFilter('urgent')" class="px-3 py-1 bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition-colors">
+                    마감임박 <span x-text="'(' + getUrgentCount() + ')'"></span>
+                </button>
+                <button @click="quickFilter('new')" class="px-3 py-1 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors">
+                    신규공고 <span x-text="'(' + getNewCount() + ')'"></span>
+                </button>
+                <button @click="quickFilter('government')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-colors">
+                    공무원 <span x-text="'(' + getGovernmentCount() + ')'"></span>
+                </button>
+                <button @click="quickFilter('seoul')" class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors">
+                    서울 <span x-text="'(' + getSeoulCount() + ')'"></span>
+                </button>
+                <button @click="clearFilters()" class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors">
+                    필터 초기화
+                </button>
+            </div>
+            
+            <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
+                <div class="flex items-center">
+                    <i data-lucide="filter" class="h-4 w-4 mr-1"></i>
+                    총 <span class="font-semibold text-blue-600" x-text="filteredJobs.length"></span>개 공고
+                    <span x-show="filteredJobs.length !== allJobs.length" class="ml-2">
+                        (<span x-text="allJobs.length"></span>개 중)
+                    </span>
+                </div>
+                <div class="text-xs text-gray-500">
+                    최종 업데이트: <span x-text="lastUpdated"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 채용공고 리스트 -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <div x-show="loading" class="flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+
+        <div x-show="!loading" class="space-y-6">
+            <template x-for="job in paginatedJobs" :key="job.id">
+                <div class="bg-white rounded-xl shadow-sm border hover:shadow-lg transition-all duration-300 fade-in"
+                     :class="job.isUrgent ? 'ring-2 ring-red-200' : ''"
+                >
+                    <div class="p-6">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center mb-3">
+                                    <h3 class="text-xl font-semibold text-gray-900 mr-3" x-text="job.title"></h3>
+                                    
+                                    <!-- 상태 배지들 -->
+                                    <div class="flex space-x-2">
+                                        <span x-show="job.isNew" class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full pulse-glow">
+                                            NEW
+                                        </span>
+                                        <span x-show="job.isUrgent" class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full pulse-glow">
+                                            마감임박
+                                        </span>
+                                        <span x-show="job.isHot" class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
+                                            HOT
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex flex-wrap items-center mb-4 space-x-4 text-sm text-gray-600">
+                                    <div class="flex items-center">
+                                        <i data-lucide="building" class="h-4 w-4 mr-1"></i>
+                                        <span x-text="job.organization"></span>
+                                    </div>
+                                    <span class="px-3 py-1 text-xs font-medium rounded-full"
+                                          :class="getTypeColor(job.type)" 
+                                          x-text="job.type"></span>
+                                    <div class="flex items-center">
+                                        <i data-lucide="map-pin" class="h-4 w-4 mr-1"></i>
+                                        <span x-text="job.region"></span>
+                                    </div>
+                                    <div class="flex items-center" x-show="job.experience">
+                                        <i data-lucide="briefcase" class="h-4 w-4 mr-1"></i>
+                                        <span x-text="job.experience"></span>
+                                    </div>
+                                </div>
+
+                                <p class="text-gray-700 mb-4 leading-relaxed" x-text="job.description"></p>
+
+                                <div class="flex items-center justify-between text-sm mb-4">
+                                    <div class="flex items-center space-x-6">
+                                        <div class="flex items-center font-medium text-green-600">
+                                            <i data-lucide="dollar-sign" class="h-4 w-4 mr-1"></i>
+                                            <span x-text="job.salary"></span>
+                                        </div>
+                                        <div class="flex items-center text-gray-500">
+                                            <i data-lucide="calendar" class="h-4 w-4 mr-1"></i>
+                                            <span>마감: </span>
+                                            <span x-text="job.deadline" :class="job.isUrgent ? 'text-red-600 font-medium' : ''"></span>
+                                        </div>
+                                        <div class="flex items-center text-gray-500">
+                                            <i data-lucide="users" class="h-4 w-4 mr-1"></i>
+                                            <span x-text="job.recruitCount + '명'"></span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-sm font-medium"
+                                              :class="getDaysLeftColor(job.deadline)" 
+                                              x-text="getDaysLeft(job.deadline)"></span>
+                                        
+                                        <button
+                                            @click="toggleFavorite(job.id)"
+                                            class="p-2 rounded-lg transition-colors"
+                                            :class="favorites.has(job.id) ? 'text-yellow-500 bg-yellow-50' : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'"
+                                        >
+                                            <i data-lucide="star" :class="favorites.has(job.id) ? 'fill-current' : ''" class="h-4 w-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="border-t border-gray-100 pt-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <p class="text-xs text-gray-600">
+                                            <strong>자격요건:</strong> <span x-text="job.requirements"></span>
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center text-xs text-gray-500 space-x-4">
+                                            <span>등록: <span x-text="job.postedDate"></span></span>
+                                            <span>조회: <span x-text="job.views + '회'"></span></span>
+                                            <span x-show="job.source">출처: <span x-text="job.source"></span></span>
+                                        </div>
+                                        
+                                        <div class="flex space-x-2">
+                                            <button
+                                                @click="shareJob(job)"
+                                                class="px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            >
+                                                <i data-lucide="share-2" class="h-3 w-3 inline mr-1"></i>
+                                                공유
+                                            </button>
+                                            <a
+                                                :href="job.url"
+                                                target="_blank"
+                                                class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                            >
+                                                자세히 보기 →
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- 페이지네이션 -->
+        <div x-show="!loading && totalPages > 1" class="mt-8 flex justify-center">
+            <nav class="flex space-x-2">
+                <button 
+                    @click="currentPage--" 
+                    :disabled="currentPage === 1"
+                    class="px-3 py-2 text-sm bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                    이전
+                </button>
+                
+                <template x-for="page in getPaginationRange()" :key="page">
+                    <button 
+                        @click="currentPage = page"
+                        :class="currentPage === page ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                        class="px-3 py-2 text-sm border rounded-lg"
+                        x-text="page"
+                    ></button>
+                </template>
+                
+                <button 
+                    @click="currentPage++" 
+                    :disabled="currentPage === totalPages"
+                    class="px-3 py-2 text-sm bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                    다음
+                </button>
+            </nav>
+        </div>
+
+        <!-- 검색 결과 없음 -->
+        <div x-show="!loading && filteredJobs.length === 0" class="text-center py-16">
+            <i data-lucide="search-x" class="h-16 w-16 text-gray-300 mx-auto mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">검색 결과가 없습니다</h3>
+            <p class="text-gray-600 mb-4">검색 조건을 변경하거나 필터를 초기화해보세요.</p>
+            <button
+                @click="clearFilters()"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+                필터 초기화
+            </button>
+        </div>
+    </section>
+
+    <!-- 알림 설정 섹션 -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8" id="alerts">
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-8">
+            <div class="flex items-center mb-6">
+                <i data-lucide="bell-ring" class="h-6 w-6 text-blue-600 mr-3"></i>
+                <h3 class="text-xl font-semibold text-gray-800">새로운 채용정보 알림 받기</h3>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">이메일 주소</label>
+                    <input 
+                        type="email" 
+                        placeholder="your@email.com"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+                        x-model="alertSettings.email"
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">관심 지역</label>
+                    <select class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+                            x-model="alertSettings.region">
+                        <option value="">모든 지역</option>
+                        <option value="서울">서울</option>
+                        <option value="경기">경기</option>
+                        <option value="부산">부산</option>
+                        <option value="대구">대구</option>
+                        <option value="대전">대전</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">관심 키워드</label>
+                    <input 
+                        type="text" 
+                        placeholder="예: 국립도서관, 공무원, 정규직"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+                        x-model="alertSettings.keywords"
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">알림 빈도</label>
+                    <select class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+                            x-model="alertSettings.frequency">
+                        <option value="immediate">즉시 (신규 등록 시)</option>
+                        <option value="daily">일일 요약</option>
+                        <option value="weekly">주간 요약</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex items-center space-x-4">
+                <button 
+                    @click="subscribeAlert()"
+                    class="px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors"
+                >
+                    알림 신청하기
+                </button>
+                
+                <div class="text-sm text-gray-600">
+                    <i data-lucide="users" class="h-4 w-4 inline mr-1"></i>
+                    <span x-text="subscriberCount.toLocaleString()"></span>명이 이미 구독중
+                </div>
+            </div>
+            
+            <p class="text-xs text-gray-600 mt-4">
+                💡 현재는 데모 버전입니다. 실제 알림 기능은 개발 중이며, 곧 실제 서비스로 업그레이드 예정입니다.
+            </p>
+        </div>
+    </section>
+
+    <!-- 푸터 -->
+    <footer class="bg-gray-900 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center mb-4">
+                        <i data-lucide="book-open" class="h-6 w-6 mr-2"></i>
+                        <span class="text-lg font-semibold">사서Job</span>
+                    </div>
+                    <p class="text-gray-400 text-sm">
+                        사서 전문 채용정보 플랫폼으로 전국의 도서관, 정보센터, 교육기관의 
+                        최신 채용소식을 한곳에서 확인하세요.
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">서비스</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="#" class="hover:text-white">채용공고</a></li>
+                        <li><a href="#" class="hover:text-white">알림 서비스</a></li>
+                        <li><a href="#" class="hover:text-white">통계 분석</a></li>
+                        <li><a href="#" class="hover:text-white">모바일 앱</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">정보</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="#" class="hover:text-white">사서 자격증</a></li>
+                        <li><a href="#" class="hover:text-white">면접 가이드</a></li>
+                        <li><a href="#" class="hover:text-white">이력서 작성법</a></li>
+                        <li><a href="#" class="hover:text-white">커뮤니티</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">연락처</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li>이메일: contact@librarianjob.kr</li>
+                        <li>전화: 02-1234-5678</li>
+                        <li class="flex space-x-2 pt-2">
+                            <a href="#" class="hover:text-white"><i data-lucide="facebook" class="h-4 w-4"></i></a>
+                            <a href="#" class="hover:text-white"><i data-lucide="twitter" class="h-4 w-4"></i></a>
+                            <a href="#" class="hover:text-white"><i data-lucide="instagram" class="h-4 w-4"></i></a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
+                <p>&copy; 2025 사서Job. All rights reserved. | 개인정보처리방침 | 이용약관</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function librarianJobApp() {
+            return {
+                // 데이터
+                allJobs: [
+                    {
+                        id: 1,
+                        title: "국립중앙도서관 사서직 9급 공무원 모집",
+                        organization: "국립중앙도서관",
+                        type: "국가공무원",
+                        region: "서울",
+                        salary: "공무원 호봉표",
+                        deadline: "2025-02-15",
+                        postedDate: "2025-01-20",
+                        requirements: "정사서 자격증, 4년제 문헌정보학과 졸업",
+                        description: "국립중앙도서관에서 사서직 9급 공무원을 신규 모집합니다. 국가대표도서관에서 전문 사서로 근무할 기회입니다.",
+                        url: "https://www.nl.go.kr",
+                        isNew: true,
+                        isUrgent: false,
+                        isHot: true,
+                        recruitCount: 3,
+                        experience: "신입",
+                        views: 1247,
+                        source: "국립중앙도서관"
+                    },
+                    {
+                        id: 2,
+                        title: "서울특별시교육청 교육공무직원(사서) 신규 채용",
+                        organization: "서울특별시교육청",
+                        type: "교육공무직",
+                        region: "서울",
+                        salary: "월 220만원",
+                        deadline: "2025-02-28",
+                        postedDate: "2025-01-18",
+                        requirements: "준사서 자격증 이상, 도서관 경력 우대",
+                        description: "서울시 소속 초·중·고등학교 도서관에서 근무할 교육공무직원을 모집합니다.",
+                        url: "https://www.sen.go.kr",
+                        isNew: true,
+                        isUrgent: false,
+                        isHot: false,
+                        recruitCount: 15,
+                        experience: "경력무관",
+                        views: 2156,
+                        source: "서울시교육청"
+                    },
+                    {
+                        id: 3,
+                        title: "부산광역시립중앙도서관 사서 계약직 채용",
+                        organization: "부산광역시",
+                        type: "계약직",
+                        region: "부산",
+                        salary: "월 280만원",
+                        deadline: "2025-09-10",
+                        postedDate: "2025-01-15",
+                        requirements: "정사서 자격증, 사서 경력 2년 이상",
+                        description: "부산시립중앙도서관에서 전문 사서를 모집합니다. 레퍼런스 서비스 및 장서개발 업무를 담당하게 됩니다.",
+                        url: "#",
+                        isNew: false,
+                        isUrgent: true,
+                        isHot: false,
+                        recruitCount: 2,
+                        experience: "경력 2년+",
+                        views: 892,
+                        source: "부산광역시"
+                    },
+                    {
+                        id: 4,
+                        title: "명지전문대학교 도서관 학술정보팀 계약직",
+                        organization: "명지전문대학교",
+                        type: "계약직",
+                        region: "서울",
+                        salary: "월 320만원",
+                        deadline: "2025-10-17",
+                        postedDate: "2025-01-12",
+                        requirements: "정사서 자격증, 대학도서관 경력 우대",
+                        description: "명지전문대학 도서관에서 학술정보 서비스 및 전자자료 관리를 담당할 계약직 사서를 모집합니다.",
+                        url: "#",
+                        isNew: false,
+                        isUrgent: true,
+                        isHot: true,
+                        recruitCount: 1,
+                        experience: "경력 1년+",
+                        views: 1543,
+                        source: "명지전문대학교"
+                    },
+                    {
+                        id: 5,
+                        title: "대덕구 공립작은도서관 기간제근로자",
+                        organization: "대덕구청",
+                        type: "기간제",
+                        region: "대전",
+                        salary: "월 210만원",
+                        deadline: "2025-02-10",
+                        postedDate: "2025-01-10",
+                        requirements: "준사서 자격증 이상, 지역주민 우대",
+                        description: "대덕구 소속 작은도서관에서 근무할 기간제 근로자를 모집합니다. 지역민을 위한 독서문화 프로그램 운영 포함.",
+                        url: "#",
+                        isNew: false,
+                        isUrgent: false,
+                        isHot: false,
+                        recruitCount: 5,
+                        experience: "신입",
+                        views: 734,
+                        source: "대덕구청"
+                    },
+                    {
+                        id: 6,
+                        title: "동덕여자대학교 춘강학술정보관 계약직 사서",
+                        organization: "동덕여자대학교",
+                        type: "계약직",
+                        region: "서울",
+                        salary: "월 290만원",
+                        deadline: "채용시까지",
+                        postedDate: "2025-01-08",
+                        requirements: "정사서 자격증, 영어 가능자 우대",
+                        description: "동덕여자대학교 춘강학술정보관에서 이용자 서비스 및 정보활용교육을 담당할 사서를 모집합니다.",
+                        url: "#",
+                        isNew: false,
+                        isUrgent: false,
+                        isHot: false,
+                        recruitCount: 1,
+                        experience: "신입가능",
+                        views: 1089,
+                        source: "동덕여자대학교"
+                    },
+                    {
+                        id: 7,
+                        title: "경기도립중앙도서관 사서직 지방공무원",
+                        organization: "경기도교육청",
+                        type: "지방공무원",
+                        region: "경기",
+                        salary: "공무원 호봉표",
+                        deadline: "2025-03-05",
+                        postedDate: "2025-01-05",
+                        requirements: "정사서 자격증, 사서직 공무원시험 합격",
+                        description: "경기도립중앙도서관에서 근무할 사서직 지방공무원을 모집합니다. 안정적인 공직생활의 기회입니다.",
+                        url: "#",
+                        isNew: false,
+                        isUrgent: false,
+                        isHot: true,
+                        recruitCount: 2,
+                        experience: "신입",
+                        views: 2543,
+                        source: "경기도교육청"
+                    },
+                    {
+                        id: 8,
+                        title: "인천광역시교육청 사서교사 임용",
+                        organization: "인천광역시교육청",
+                        type: "정규직",
+                        region: "인천",
+                        salary: "교원봉급표",
+                        deadline: "2025-02-22",
+                        postedDate: "2025-01-03",
+                        requirements: "사서교사 자격증, 교원임용시험 합격",
+                        description: "인천시 소속 중·고등학교에서 사서교사로 근무할 교원을 모집합니다.",
+                        url: "#",
+                        isNew: false,
+                        isUrgent: false,
+                        isHot: false,
+                        recruitCount: 8,
+                        experience: "신입",
+                        views: 1876,
+                        source: "인천교육청"
+                    }
+                ],
+                
+                // 상태 변수
+                filteredJobs: [],
+                loading: false,
+                searchTerm: '',
+                filterType: '',
+                filterRegion: '',
+                sortOrder: 'newest',
+                currentPage: 1,
+                itemsPerPage: 5,
+                
+                // UI 상태
+                favorites: new Set([1, 3]),
+                newJobsCount: 3,
+                lastUpdated: '2025-09-03 14:30',
+                subscriberCount: 2847,
+                
+                // 알림 설정
+                alertSettings: {
+                    email: '',
+                    region: '',
+                    keywords: '',
+                    frequency: 'immediate'
+                },
+
+                // 초기화
+                init() {
+                    this.filteredJobs = [...this.allJobs];
+                    this.updateStats();
+                    
+                    // 아이콘 초기화
+                    this.$nextTick(() => {
+                        lucide.createIcons();
+                    });
+                },
+
+                // 통계 계산
+                get stats() {
+                    return {
+                        totalJobs: this.allJobs.length,
+                        newToday: this.allJobs.filter(job => job.isNew).length,
+                        urgent: this.allJobs.filter(job => job.isUrgent).length,
+                        government: this.allJobs.filter(job => job.type.includes('공무원')).length
+                    };
+                },
+
+                // 페이지네이션
+                get totalPages() {
+                    return Math.ceil(this.filteredJobs.length / this.itemsPerPage);
+                },
+
+                get paginatedJobs() {
+                    const start = (this.currentPage - 1) * this.itemsPerPage;
+                    const end = start + this.itemsPerPage;
+                    return this.filteredJobs.slice(start, end);
+                },
+
+                // 필터링 및 정렬
+                filterJobs() {
+                    let filtered = this.allJobs.filter(job => {
+                        const matchesSearch = this.searchTerm === '' || 
+                            job.title.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+                            job.organization.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+                            job.region.toLowerCase().includes(this.searchTerm.toLowerCase());
+                        
+                        const matchesType = this.filterType === '' || job.type === this.filterType;
+                        const matchesRegion = this.filterRegion === '' || job.region === this.filterRegion;
+                        
+                        return matchesSearch && matchesType && matchesRegion;
+                    });
+
+                    // 정렬
+                    switch(this.sortOrder) {
+                        case 'newest':
+                            filtered.sort((a, b) => new Date(b.postedDate) - new Date(a.postedDate));
+                            break;
+                        case 'deadline':
+                            filtered.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+                            break;
+                        case 'salary':
+                            filtered.sort((a, b) => this.extractSalary(b.salary) - this.extractSalary(a.salary));
+                            break;
+                        case 'alphabetical':
+                            filtered.sort((a, b) => a.organization.localeCompare(b.organization));
+                            break;
+                    }
+
+                    this.filteredJobs = filtered;
+                    this.currentPage = 1; // 필터링 시 첫 페이지로
+                },
+
+                // 급여에서 숫자 추출 (정렬용)
+                extractSalary(salaryText) {
+                    const match = salaryText.match(/\d+/);
+                    return match ? parseInt(match[0]) : 0;
+                },
+
+                // 빠른 필터
+                quickFilter(type) {
+                    this.clearFilters();
+                    switch(type) {
+                        case 'urgent':
+                            this.filteredJobs = this.allJobs.filter(job => job.isUrgent);
+                            break;
+                        case 'new':
+                            this.filteredJobs = this.allJobs.filter(job => job.isNew);
+                            break;
+                        case 'government':
+                            this.filteredJobs = this.allJobs.filter(job => job.type.includes('공무원'));
+                            break;
+                        case 'seoul':
+                            this.filteredJobs = this.allJobs.filter(job => job.region === '서울');
+                            break;
+                    }
+                    this.currentPage = 1;
+                },
+
+                // 필터 초기화
+                clearFilters() {
+                    this.searchTerm = '';
+                    this.filterType = '';
+                    this.filterRegion = '';
+                    this.sortOrder = 'newest';
+                    this.filteredJobs = [...this.allJobs];
+                    this.currentPage = 1;
+                },
+
+                // 유틸리티 함수들
+                getDaysLeft(deadline) {
+                    if (deadline === "채용시까지") return "상시모집";
+                    const today = new Date();
+                    const deadlineDate = new Date(deadline);
+                    const diffTime = deadlineDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays < 0) return "마감";
+                    if (diffDays === 0) return "오늘 마감";
+                    if (diffDays === 1) return "내일 마감";
+                    return `${diffDays}일 남음`;
+                },
+
+                getDaysLeftColor(deadline) {
+                    const daysLeft = this.getDaysLeft(deadline);
+                    if (daysLeft.includes('마감')) return 'text-red-600';
+                    if (daysLeft.includes('오늘') || daysLeft.includes('내일')) return 'text-orange-600';
+                    return 'text-blue-600';
+                },
+
+                getTypeColor(type) {
+                    const colors = {
+                        '국가공무원': 'bg-blue-100 text-blue-800',
+                        '지방공무원': 'bg-blue-100 text-blue-800',
+                        '교육공무직': 'bg-green-100 text-green-800',
+                        '계약직': 'bg-purple-100 text-purple-800',
+                        '기간제': 'bg-orange-100 text-orange-800',
+                        '정규직': 'bg-emerald-100 text-emerald-800'
+                    };
+                    return colors[type] || 'bg-gray-100 text-gray-800';
+                },
+
+                // 카운트 함수들
+                getUrgentCount() {
+                    return this.allJobs.filter(job => job.isUrgent).length;
+                },
+
+                getNewCount() {
+                    return this.allJobs.filter(job => job.isNew).length;
+                },
+
+                getGovernmentCount() {
+                    return this.allJobs.filter(job => job.type.includes('공무원')).length;
+                },
+
+                getSeoulCount() {
+                    return this.allJobs.filter(job => job.region === '서울').length;
+                },
+
+                // 페이지네이션 범위
+                getPaginationRange() {
+                    let start = Math.max(1, this.currentPage - 2);
+                    let end = Math.min(this.totalPages, start + 4);
+                    start = Math.max(1, end - 4);
+                    
+                    const range = [];
+                    for (let i = start; i <= end; i++) {
+                        range.push(i);
+                    }
+                    return range;
+                },
+
+                // 액션 함수들
+                toggleFavorite(jobId) {
+                    if (this.favorites.has(jobId)) {
+                        this.favorites.delete(jobId);
+                    } else {
+                        this.favorites.add(jobId);
+                    }
+                },
+
+                shareJob(job) {
+                    if (navigator.share) {
+                        navigator.share({
+                            title: job.title,
+                            text: job.description,
+                            url: job.url
+                        });
+                    } else {
+                        // 대체 공유 방법
+                        const text = `${job.title} - ${job.organization}\n${job.url}`;
+                        navigator.clipboard.writeText(text);
+                        alert('링크가 클립보드에 복사되었습니다!');
+                    }
+                },
+
+                refreshJobs() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                        this.lastUpdated = new Date().toLocaleString('ko-KR');
+                        this.newJobsCount = Math.floor(Math.random() * 5) + 1;
+                        alert('새로운 채용공고를 확인했습니다!');
+                    }, 2000);
+                },
+
+                subscribeAlert() {
+                    if (!this.alertSettings.email) {
+                        alert('이메일 주소를 입력해주세요.');
+                        return;
+                    }
+                    
+                    // 실제로는 서버에 저장
+                    alert(`알림 설정이 완료되었습니다!\n이메일: ${this.alertSettings.email}\n지역: ${this.alertSettings.region || '모든 지역'}\n키워드: ${this.alertSettings.keywords || '없음'}\n빈도: ${this.alertSettings.frequency}`);
+                    
+                    // 폼 초기화
+                    this.alertSettings = {
+                        email: '',
+                        region: '',
+                        keywords: '',
+                        frequency: 'immediate'
+                    };
+                    
+                    this.subscriberCount += 1;
+                },
+
+                updateStats() {
+                    // 통계 업데이트 로직
+                }
+            }
+        }
+    </script>
+</body>
+</html>
